@@ -1,0 +1,73 @@
+<html>
+  <head>
+<script src="require.js"></script>
+
+  </head>
+
+  <body>
+<div id="inputs">
+<textarea id="code">
+@startuml
+
+participant StocksInbound : InboundEndpoint(protocol("http"),port("8290"),context("/stocks"))
+
+participant StocksPipeline : Pipeline("Stocks_Flow")
+
+participant NYSEOutbound : OutboundEndpoint(protocol("http"),host("http://localhost:8080/stockquote/all"))
+
+participant NASDAQOutbound : OutboundEndpoint(protocol("http"),host("http://localhost:8081/stockquote/all"))
+
+StocksInbound -> StocksPipeline : "client request"
+
+StocksPipeline::log(level("CUSTOM"),category("INFO"),property(key("XXX"),value("Before filter statement")))
+
+if with condition(source("$header.exchange"),pattern("nyse"))
+    StocksPipeline::log(level("CUSTOM"),category("INFO"),property(key("XXX"),value("filter  statement true")))
+    StocksPipeline -> NYSEOutbound : "Request to New York Stock Exchange"
+    NYSEOutbound -> StocksPipeline : "StockQuotes from New York Stock Exchange"
+
+else
+    StocksPipeline::log(level("CUSTOM"),category("INFO"),property(key("XXX"),value("filter  statement false")))
+    StocksPipeline -> NASDAQOutbound : "Request to NASDAQ"
+    NASDAQOutbound -> StocksPipeline : "StockQuotes from NASDAQ"
+end
+
+StocksPipeline::log(level("CUSTOM"),category("INFO"),property(key("XXX"),value("After filter statement")))
+
+StocksPipeline -> StocksInbound : "Final Response"
+
+
+@enduml
+</textarea>
+<br/>
+<button id="parse">Parse</button>
+</div>
+
+<script type="text/javascript">
+
+var antlr4 = require('antlr4/index');
+var TodoLexer = require('generated-parser/NELLexer');
+var TodoParser = require('generated-parser/NELParser');
+var Listener = require('custom_js/TestListener');
+var el = document.getElementById("parse");
+document.getElementById("parse").addEventListener("click", function(){
+
+    var input = document.getElementById("code").value;
+    var chars = new antlr4.InputStream(input);
+    var lexer = new TodoLexer.NELLexer(chars);
+    var tokens  = new antlr4.CommonTokenStream(lexer);
+    var parser = new TodoParser.NELParser(tokens);
+    parser.buildParseTrees = true;
+    var tree = parser.script();
+
+    var listener = new Listener.TestListener();
+
+    antlr4.tree.ParseTreeWalker.DEFAULT.walk(listener, tree);
+});
+</script>
+<div id="tree">
+</div> 
+</body>
+
+</html>
+
